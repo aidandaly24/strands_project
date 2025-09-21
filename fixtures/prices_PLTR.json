@@ -1,0 +1,18 @@
+{
+  "ticker": "PLTR",
+  "currency": "USD",
+  "history": [
+    {"date": "2024-03-25", "close": 23.15},
+    {"date": "2024-03-26", "close": 23.42},
+    {"date": "2024-03-27", "close": 23.05},
+    {"date": "2024-03-28", "close": 23.88},
+    {"date": "2024-03-29", "close": 24.12},
+    {"date": "2024-04-01", "close": 24.32},
+    {"date": "2024-04-02", "close": 24.08},
+    {"date": "2024-04-03", "close": 24.66},
+    {"date": "2024-04-04", "close": 24.91},
+    {"date": "2024-04-05", "close": 25.35}
+  ],
+  "fifty_two_week_high": 25.35,
+  "fifty_two_week_low": 9.55
+}
