@@ -1,0 +1,29 @@
+{
+  "ticker": "PLTR",
+  "articles": [
+    {
+      "title": "Palantir expands AI platform with new government win",
+      "summary": "The company secured a multi-year defense analytics contract, highlighting momentum in classified AI deployments.",
+      "url": "https://news.example.com/palantir-defense-ai",
+      "published_at": "2024-04-04",
+      "sentiment": 0.4,
+      "source": "Example News"
+    },
+    {
+      "title": "Analysts debate sustainability of Palantir's valuation",
+      "summary": "Equity analysts caution that the stock already prices in aggressive growth assumptions, though backlog continues to build.",
+      "url": "https://news.example.com/palantir-valuation",
+      "published_at": "2024-04-03",
+      "sentiment": -0.1,
+      "source": "MarketWatch"
+    },
+    {
+      "title": "Commercial segment drives Palantir's latest quarterly beat",
+      "summary": "Commercial revenue grew 32% year over year as customers expand AI pilots to production workloads.",
+      "url": "https://news.example.com/palantir-commercial-growth",
+      "published_at": "2024-04-02",
+      "sentiment": 0.35,
+      "source": "Reuters"
+    }
+  ]
+}
