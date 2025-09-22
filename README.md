@@ -2,6 +2,18 @@
 
 This repository contains a live-data Strands-powered equity research copilot. The `runner.py` entrypoint loads configuration from environment variables (or a `.env` file), instantiates the official `strands.Agent` runtime with custom research tools that call OpenAI (or AWS Bedrock), Yahoo Finance, NewsAPI/GDELT, and the SEC submissions API, then produces Markdown and JSON briefs for the requested tickers.
 
+## How the Agent Works
+
+The `ResearchAgent` wires Strands’ structured-output runtime to a handful of live tools:
+
+- **Prices & ratios:** Pulls ~4 months of history from Yahoo Finance (`yfinance`) and computes SMA20/SMA50/RSI14 on the fly.
+- **News feed:** Hits NewsAPI when `NEWS_TOKEN` is set, otherwise falls back to live GDELT headlines (with a naïve sentiment score).
+- **SEC filings:** Walks the SEC submissions JSON, downloads the latest HTML 10-K/10-Q/20-F/40-F/F-10/6-K, and extracts Item 7 MD&A (or captures the filing metadata when that section isn’t present).
+- **Peer list:** Provides a small static peer map for context.
+
+Those payloads—plus the optional `--focus` hint are passed to `strands.Agent.structured_output(...)`, which runs against your chosen large-language model (OpenAI by default, AWS Bedrock when AWS creds are present) to generate a fully structured brief. The Markdown and JSON artifacts land in `runs/<timestamp>/`, or you can run `python runner.py <ticker> --test` to collect tool failures without writing files.
+
+
 ## Getting Started
 
 ```bash
