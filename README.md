@@ -46,8 +46,8 @@ AWS_PROFILE="bedrock-programmatic"  # or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY
 ```bash
 python3 runner.py AMZN --focus "AWS's revenue growth"
 ```
-
-```
+----------------------
+Output in Markdown:
 # Research Brief
 
 ## AMZN
@@ -95,7 +95,7 @@ MSFT, GOOGL, WMT
 9. [Into The Deep 2022 1080p AMZN WEB-DL H264-GPRS — Rlsbb.to (2025-09-20)](https://post.rlsbb.to/into-the-deep-2022-1080p-amzn-web-dl-h264-gprs/)
 10. [“We Were So Worried About” Amazon.com, Inc. (AMZN), Says Jim Cramer — Yahoo Entertainment (2025-09-20)](https://finance.yahoo.com/news/were-worried-amazon-com-inc-190530622.html)
 11. [Management discussion and analysis excerpt — SEC EDGAR (2025-08-01)](https://www.sec.gov/Archives/edgar/data/1018724/000101872425000086/amzn-20250630.htm)
-```
+
 
 ## Testing
 
