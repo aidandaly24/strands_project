@@ -6,6 +6,7 @@ import textwrap
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from collections.abc import Mapping
 from statistics import fmean
 from typing import Any, Dict, Iterable, List, Optional, cast
 
@@ -23,6 +24,10 @@ from tools import (
 )
 
 from settings import Settings
+
+
+class ToolExecutionError(RuntimeError):
+    """Raised when a tool fails but we want to continue collecting errors."""
 
 
 SYSTEM_PROMPT = (
@@ -54,32 +59,18 @@ class RunArtifacts:
 class ResearchAgent:
     """Aggregate the individual tools to produce research artifacts."""
 
-    def __init__(self, settings: Settings, *, model: Any | None = None) -> None:
+    def __init__(self, settings: Settings, *, model: Any | None = None, collect_failures: bool = False) -> None:
         self.settings = settings
+        self.collect_failures = collect_failures
+        self.failures: List[Dict[str, Any]] = []
+        self.partial_artifacts: Optional[RunArtifacts] = None
 
         self._tool_objects: Dict[str, DecoratedFunctionTool] = {
-            "prices": build_prices_tool(
-                use_fixtures=settings.use_fixtures,
-                fixtures_path=settings.fixtures_path,
-            ),
-            "news": build_news_tool(
-                use_fixtures=settings.use_fixtures,
-                fixtures_path=settings.fixtures_path,
-                news_token=settings.news_token,
-            ),
-            "edgar": build_edgar_tool(
-                use_fixtures=settings.use_fixtures,
-                fixtures_path=settings.fixtures_path,
-                sec_user_agent=settings.sec_user_agent,
-            ),
-            "ratios": build_ratios_tool(
-                use_fixtures=settings.use_fixtures,
-                fixtures_path=settings.fixtures_path,
-            ),
-            "peers": build_peers_tool(
-                use_fixtures=settings.use_fixtures,
-                fixtures_path=settings.fixtures_path,
-            ),
+            "prices": build_prices_tool(),
+            "news": build_news_tool(news_token=settings.news_token),
+            "edgar": build_edgar_tool(sec_user_agent=settings.sec_user_agent),
+            "ratios": build_ratios_tool(),
+            "peers": build_peers_tool(),
         }
 
         agent_kwargs: Dict[str, Any] = {
@@ -100,7 +91,24 @@ class ResearchAgent:
         ticker_payloads: List[Dict[str, Any]] = []
         markdown_sections: List[str] = ["# Research Brief"]
         for ticker in tickers:
-            payload = self._gather_for_ticker(ticker)
+            try:
+                payload = self._gather_for_ticker(ticker)
+            except ToolExecutionError:
+                if self.collect_failures:
+                    continue
+                raise
+            except Exception as exc:
+                if self.collect_failures:
+                    self.failures.append(
+                        {
+                            "ticker": ticker,
+                            "stage": "analysis",
+                            "error": str(exc),
+                        }
+                    )
+                    continue
+                raise
+
             payload["focus"] = focus
             ticker_payloads.append(payload)
             markdown_sections.append(self._format_markdown_for_ticker(payload))
@@ -111,7 +119,13 @@ class ResearchAgent:
             "tickers": ticker_payloads,
         }
         markdown = "\n\n".join(markdown_sections).strip() + "\n"
-        return RunArtifacts(json_payload=json_payload, markdown=markdown, output_dir=output_dir)
+        artifacts = RunArtifacts(json_payload=json_payload, markdown=markdown, output_dir=output_dir)
+
+        if self.collect_failures and self.failures:
+            self.partial_artifacts = artifacts
+            raise RuntimeError(self._format_failures())
+
+        return artifacts
 
     def _gather_for_ticker(self, ticker: str) -> Dict[str, Any]:
         price_data = self._invoke_tool("prices", ticker=ticker)
@@ -136,18 +150,25 @@ class ResearchAgent:
                     "published_at": article.get("published_at"),
                 }
             )
-        edgar_source_url: Optional[str]
-        if self.settings.use_fixtures:
-            edgar_source_url = str(self.settings.fixtures_path / f"filing_{ticker}_item7.html")
-        else:
-            edgar_source_url = cast(Optional[str], edgar_data.get("source_url") or edgar_data.get("url"))
+        edgar_source_url = cast(Optional[str], edgar_data.get("source_url") or edgar_data.get("url"))
+
+        edgar_error = edgar_data.get("error")
+        if edgar_error and self.collect_failures:
+            self.failures.append(
+                {
+                    "ticker": ticker,
+                    "stage": "tool",
+                    "tool": "edgar",
+                    "error": edgar_error,
+                }
+            )
 
         citations.append(
             {
                 "ticker": ticker,
-                "title": "Management discussion and analysis excerpt",
+                "title": "Management discussion and analysis excerpt" + (" (not available)" if edgar_error else ""),
                 "url": edgar_source_url,
-                "source": "SEC Filing Fixture" if self.settings.use_fixtures else "SEC EDGAR",
+                "source": "SEC EDGAR",
                 "published_at": cast(str, edgar_data.get("filed_on", "")),
             }
         )
@@ -164,23 +185,7 @@ class ResearchAgent:
             negative_articles=negative_articles,
         )
 
-        if generated_sections is None:
-            overview = self._build_overview(price_data, ratio_data, avg_sentiment)
-            moat = edgar_data.get("section", "Management commentary unavailable.")
-            performance = self._build_performance(ratio_data, price_data)
-            catalysts = self._summarise_articles(positive_articles)
-            risks = self._summarise_articles(negative_articles)
-            valuation = self._build_valuation(price_data)
-            sections_payload = {
-                "overview": overview,
-                "moat": moat,
-                "performance": performance,
-                "catalysts": catalysts,
-                "risks": risks,
-                "valuation": valuation,
-            }
-        else:
-            sections_payload = generated_sections.model_dump()
+        sections_payload = generated_sections.model_dump()
 
         return {
             "ticker": ticker,
@@ -214,7 +219,7 @@ class ResearchAgent:
 
         structured_fn = getattr(self.agent, "structured_output", None)
         if structured_fn is None:
-            return None
+            raise RuntimeError("Configured agent does not support structured outputs; cannot generate analysis.")
 
         prompt = textwrap.dedent(
             f"""
@@ -249,30 +254,18 @@ class ResearchAgent:
             sources.
             """
         ).strip()
+        try:
+            result = structured_fn(ResearchSections, prompt=prompt)
+        except Exception as exc:
+            raise RuntimeError("Structured generation failed") from exc
 
-        candidate_payloads = (
-            {"prompt": prompt, "response_model": ResearchSections},
-            {"prompt": prompt, "schema": ResearchSections},
-            {"input": prompt, "response_model": ResearchSections},
-        )
+        if isinstance(result, ResearchSections):
+            return result
 
-        for call_kwargs in candidate_payloads:
-            try:
-                result = structured_fn(**call_kwargs)
-            except TypeError:
-                continue
-            except Exception:
-                return None
-
-            if isinstance(result, ResearchSections):
-                return result
-
-            try:
-                return ResearchSections.model_validate(result)
-            except ValidationError:
-                continue
-
-        return None
+        try:
+            return ResearchSections.model_validate(result)
+        except ValidationError as exc:
+            raise RuntimeError("Structured generation returned invalid payload") from exc
 
     def _format_markdown_for_ticker(self, payload: Dict[str, Any]) -> str:
         ticker = payload["ticker"]
@@ -326,58 +319,37 @@ class ResearchAgent:
         tool = self._tool_objects[name]
         tool_caller = getattr(self.agent.tool, tool.tool_name)
         result = tool_caller(**kwargs)
-        payload = extract_json_content(result)
-        return cast(Dict[str, Any], payload)
+        try:
+            payload = extract_json_content(result)
+        except Exception as exc:
+            if self.collect_failures:
+                self.failures.append(
+                    {
+                        "ticker": kwargs.get("ticker"),
+                        "stage": "tool",
+                        "tool": name,
+                        "error": str(exc),
+                    }
+                )
+                raise ToolExecutionError(str(exc)) from exc
+            raise
 
-    @staticmethod
-    def _build_overview(price_data: Dict[str, Any], ratio_data: Dict[str, float], sentiment: float) -> str:
-        latest_close = ratio_data.get("latest_close")
-        high = price_data.get("fifty_two_week_high")
-        low = price_data.get("fifty_two_week_low")
-        return (
-            f"Shares trade at ${latest_close:.2f} within a 52-week range of ${low:.2f}–${high:.2f}. "
-            f"Headline sentiment over the past week averages {sentiment:.2f}."
-        )
+        if isinstance(payload, Mapping):
+            return dict(payload)
 
-    @staticmethod
-    def _build_performance(ratio_data: Dict[str, float], price_data: Dict[str, Any]) -> str:
-        sma20 = ratio_data.get("sma20")
-        sma50 = ratio_data.get("sma50")
-        rsi = ratio_data.get("rsi14")
-        latest = ratio_data.get("latest_close")
-        currency = price_data.get("currency", "USD")
-        return (
-            f"Latest close: {currency} {latest:.2f}. SMA20: {sma20:.2f}, SMA50: {sma50:.2f}, "
-            f"RSI14: {rsi:.2f}."
-        )
+        raise RuntimeError(f"Tool '{name}' did not return JSON content: {payload}")
 
-    @staticmethod
-    def _summarise_articles(articles: List[Dict[str, Any]]) -> str:
-        if not articles:
-            return (
-                "Recent monitoring did not surface fresh red flags for the company. "
-                "Investors should remain mindful of execution risks and potential regulatory scrutiny in core markets."
-            )
-        tone = "favourable" if articles[0].get("sentiment", 0) >= 0 else "cautionary"
-        bullets = []
-        for article in articles[:3]:
-            summary = article.get("summary") or article.get("title")
-            source = article.get("source", "")
-            bullets.append(f"- {summary} ({source})")
-        intro = (
-            f"Recent coverage surfaces {len(articles)} {tone} developments shaping investor "
-            "sentiment."
-        )
-        return intro + "\n\n" + "\n".join(bullets)
+    def _format_failures(self) -> str:
+        lines = ["Live run encountered the following issues:"]
+        for idx, failure in enumerate(self.failures, start=1):
+            parts = [f"[{idx}]", failure.get("stage", "unknown").upper()]
+            if failure.get("ticker"):
+                parts.append(f"ticker={failure['ticker']}")
+            if failure.get("tool"):
+                parts.append(f"tool={failure['tool']}")
+            message = failure.get("error", "Unknown error")
+            lines.append(f"{' '.join(parts)} -> {message}")
+        return "\n".join(lines)
 
-    @staticmethod
-    def _build_valuation(price_data: Dict[str, Any]) -> str:
-        high = price_data.get("fifty_two_week_high")
-        low = price_data.get("fifty_two_week_low")
-        latest = price_data.get("history", [])[-1]["close"] if price_data.get("history") else 0.0
-        distance_to_high = ((high - latest) / high * 100) if high else 0.0
-        return (
-            f"Trading {distance_to_high:.1f}% below the 52-week high of ${high:.2f}, "
-            f"with downside to the 52-week low at ${low:.2f}. "
-            f"The latest close near ${latest:.2f} frames the upside/downside skew investors are weighing."
-        )
+    def failure_report(self) -> str:
+        return self._format_failures() if self.failures else ""

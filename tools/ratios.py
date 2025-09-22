@@ -1,13 +1,12 @@
 """Technical ratio helpers derived from price history."""
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
 from strands.tools import tool
 from strands.tools.decorator import DecoratedFunctionTool
 
-from .base import BaseTool, json_tool_response
+from .base import json_tool_response
 
 
 def _sma(values: Iterable[float]) -> float:
@@ -36,11 +35,8 @@ def _rsi(prices: List[float], period: int = 14) -> float:
     return round(100 - (100 / (1 + rs)), 2)
 
 
-class RatiosTool(BaseTool):
+class RatiosTool:
     """Compute SMA20, SMA50, and RSI14 from price history."""
-
-    def __init__(self, *, use_fixtures: bool, fixtures_path: Path) -> None:
-        super().__init__(use_fixtures=use_fixtures, fixtures_path=fixtures_path)
 
     def compute(self, price_payload: Dict[str, Any]) -> Dict[str, float]:
         history = price_payload.get("history", [])
@@ -53,10 +49,10 @@ class RatiosTool(BaseTool):
         }
 
 
-def build_ratios_tool(*, use_fixtures: bool, fixtures_path: Path) -> DecoratedFunctionTool:
+def build_ratios_tool() -> DecoratedFunctionTool:
     """Create a Strands tool to compute technical ratios from price payloads."""
 
-    backend = RatiosTool(use_fixtures=use_fixtures, fixtures_path=fixtures_path)
+    backend = RatiosTool()
 
     @tool(name="ratios", description="Compute SMA and RSI metrics from price history data.")
     def ratios_tool(price_payload: Dict[str, Any]) -> Dict[str, float]:

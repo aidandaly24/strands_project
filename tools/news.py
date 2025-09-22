@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Any, Dict, List
 
 try:  # pragma: no cover - optional dependency for live mode
@@ -13,20 +12,17 @@ except Exception:  # pragma: no cover - offline fallback
 from strands.tools import tool
 from strands.tools.decorator import DecoratedFunctionTool
 
-from .base import BaseTool, json_tool_response
+from .base import json_tool_response
 
 
-class NewsTool(BaseTool):
-    """Fetch recent headlines for a ticker using NewsAPI or fixtures."""
+class NewsTool:
+    """Fetch recent headlines for a ticker using live news providers."""
 
-    def __init__(self, *, use_fixtures: bool, fixtures_path: Path, news_token: str | None) -> None:
-        super().__init__(use_fixtures=use_fixtures, fixtures_path=fixtures_path)
+    def __init__(self, *, news_token: str | None) -> None:
         self.news_token = news_token
 
     def fetch(self, ticker: str) -> Dict[str, Any]:
         ticker = ticker.upper()
-        if self.use_fixtures:
-            raise RuntimeError("Fixture mode is disabled; live news data is required.")
         if self.news_token:
             return self._fetch_newsapi_headlines(ticker)
         return self._fetch_gdelt_headlines(ticker)
@@ -111,12 +107,10 @@ class NewsTool(BaseTool):
         return round((positive - negative) / total, 2)
 
 
-def build_news_tool(
-    *, use_fixtures: bool, fixtures_path: Path, news_token: str | None
-) -> DecoratedFunctionTool:
+def build_news_tool(*, news_token: str | None) -> DecoratedFunctionTool:
     """Create a Strands tool that fetches recent news articles."""
 
-    backend = NewsTool(use_fixtures=use_fixtures, fixtures_path=fixtures_path, news_token=news_token)
+    backend = NewsTool(news_token=news_token)
 
     @tool(name="news", description="Fetch NewsAPI headlines and naive sentiment for a ticker symbol.")
     def news_tool(ticker: str) -> Dict[str, Any]:

@@ -54,15 +54,28 @@ def _create_model(settings: Settings) -> object:
     return BedrockModel(**model_args)
 
 
-def run(tickers: Iterable[str], *, focus: Optional[str] = None) -> RunArtifacts:
+def run(
+    tickers: Iterable[str], *, focus: Optional[str] = None, collect_failures: bool = False
+) -> RunArtifacts:
     """Run the research agent for the provided tickers and persist artifacts."""
     settings = Settings.load()
     settings.ensure_directories()
 
     model = _create_model(settings)
 
-    agent = ResearchAgent(settings, model=model)
-    artifacts = agent.run(tickers, focus=focus)
+    agent = ResearchAgent(settings, model=model, collect_failures=collect_failures)
+
+    try:
+        artifacts = agent.run(tickers, focus=focus)
+    except RuntimeError as exc:
+        if collect_failures and agent.failures:
+            print(agent.failure_report())
+            raise SystemExit(1) from exc
+        raise
+
+    if collect_failures:
+        print("All tools succeeded without errors.")
+        return artifacts
 
     json_path = artifacts.output_dir / "brief.json"
     md_path = artifacts.output_dir / "brief.md"
@@ -80,6 +93,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate equity research briefs using the Strands runner.")
     parser.add_argument("tickers", nargs="*", help="Ticker symbols to analyse", default=["AMZN"])
     parser.add_argument("--focus", help="Optional focus prompt to steer the brief", default=None)
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Collect tool failures without writing output artifacts",
+    )
     return parser
 
 
@@ -87,7 +105,7 @@ def main() -> None:
     parser = build_arg_parser()
     args = parser.parse_args()
     tickers = args.tickers or ["AMZN"]
-    run(tickers, focus=args.focus)
+    run(tickers, focus=args.focus, collect_failures=args.test)
 
 
 if __name__ == "__main__":

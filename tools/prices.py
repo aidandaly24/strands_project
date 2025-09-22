@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Any, Dict, List
 
 import statistics
@@ -15,16 +14,14 @@ except Exception:  # pragma: no cover - optional dependency for offline mode
 from strands.tools import tool
 from strands.tools.decorator import DecoratedFunctionTool
 
-from .base import BaseTool, json_tool_response
+from .base import json_tool_response
 
 
-class PricesTool(BaseTool):
+class PricesTool:
     """Fetch price history and derived metrics for a ticker."""
 
     def fetch(self, ticker: str) -> Dict[str, Any]:
         ticker = ticker.upper()
-        if self.use_fixtures:
-            raise RuntimeError("Fixture mode is disabled; live market data is required.")
         if yf is None:
             raise RuntimeError("yfinance is required for live price fetching but is not installed.")
 
@@ -49,17 +46,20 @@ class PricesTool(BaseTool):
             raise ValueError(f"No price data returned for {ticker}.")
         history: List[Dict[str, Any]] = []
         for index, row in data.tail(90).iterrows():
+            close_value = row["Close"]
+            if hasattr(close_value, "item"):
+                close_value = close_value.item()
             history.append({
                 "date": index.strftime("%Y-%m-%d"),
-                "close": round(float(row["Close"]), 2),
+                "close": round(float(close_value), 2),
             })
         return history
 
 
-def build_prices_tool(*, use_fixtures: bool, fixtures_path: Path) -> DecoratedFunctionTool:
+def build_prices_tool() -> DecoratedFunctionTool:
     """Create a Strands tool for fetching price payloads."""
 
-    backend = PricesTool(use_fixtures=use_fixtures, fixtures_path=fixtures_path)
+    backend = PricesTool()
 
     @tool(name="prices", description="Fetch price history and summary statistics for an equity ticker.")
     def prices_tool(ticker: str) -> Dict[str, Any]:

@@ -21,24 +21,12 @@ class Settings:
     news_token: str | None
     env: str
     log_level: str
-    use_fixtures: bool
-    fixtures_path: Path
     runs_dir: Path
 
     @classmethod
     def load(cls) -> "Settings":
         load_dotenv()
-        def _get_bool(name: str, default: bool = False) -> bool:
-            value = os.getenv(name)
-            if value is None:
-                return default
-            return value.strip().lower() in {"1", "true", "yes", "on"}
-
-        fixtures_path = Path(os.getenv("FIXTURES_PATH", "fixtures"))
         runs_dir = Path(os.getenv("RUNS_DIR", "runs"))
-
-        if _get_bool("USE_FIXTURES", default=False):
-            raise ValueError("Offline fixture mode is disabled. Remove USE_FIXTURES from the environment.")
 
         return cls(
             openai_api_key=os.getenv("OPENAI_API_KEY"),
@@ -46,11 +34,8 @@ class Settings:
             news_token=os.getenv("NEWS_TOKEN"),
             env=os.getenv("ENV", "dev"),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
-            use_fixtures=False,
-            fixtures_path=fixtures_path,
             runs_dir=runs_dir,
         )
 
     def ensure_directories(self) -> None:
-        self.fixtures_path.mkdir(parents=True, exist_ok=True)
         self.runs_dir.mkdir(parents=True, exist_ok=True)
