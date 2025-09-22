@@ -1,35 +1,11 @@
-"""Base utilities shared by tool implementations."""
+"""Shared helpers for Strands tool implementations."""
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 
 ToolResult = dict[str, Any]
-
-
-class BaseTool:
-    """Provide helpers for loading fixture payloads and resolving paths."""
-
-    def __init__(self, *, use_fixtures: bool, fixtures_path: Path) -> None:
-        self.use_fixtures = use_fixtures
-        self.fixtures_path = fixtures_path
-
-    def _fixture_path(self, name: str) -> Path:
-        path = self.fixtures_path / name
-        if not path.exists():
-            raise FileNotFoundError(f"Fixture '{name}' not found under {self.fixtures_path}.")
-        return path
-
-    def load_fixture_json(self, name: str) -> Any:
-        path = self._fixture_path(name)
-        with path.open("r", encoding="utf-8") as handle:
-            return json.load(handle)
-
-    def load_fixture_text(self, name: str) -> str:
-        path = self._fixture_path(name)
-        return path.read_text(encoding="utf-8")
 
 
 def json_tool_response(payload: Any) -> ToolResult:

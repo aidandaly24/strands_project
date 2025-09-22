@@ -1,13 +1,12 @@
 """Hard-coded peer groups for key tickers."""
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Dict, List
 
 from strands.tools import tool
 from strands.tools.decorator import DecoratedFunctionTool
 
-from .base import BaseTool, json_tool_response
+from .base import json_tool_response
 
 
 _PEER_MAP: Dict[str, List[str]] = {
@@ -17,11 +16,8 @@ _PEER_MAP: Dict[str, List[str]] = {
 }
 
 
-class PeersTool(BaseTool):
+class PeersTool:
     """Return a static peer group for a ticker."""
-
-    def __init__(self, *, use_fixtures: bool, fixtures_path: Path) -> None:
-        super().__init__(use_fixtures=use_fixtures, fixtures_path=fixtures_path)
 
     def fetch(self, ticker: str) -> Dict[str, List[str]]:
         ticker = ticker.upper()
@@ -29,10 +25,10 @@ class PeersTool(BaseTool):
         return {"ticker": ticker, "peers": peers}
 
 
-def build_peers_tool(*, use_fixtures: bool, fixtures_path: Path) -> DecoratedFunctionTool:
+def build_peers_tool() -> DecoratedFunctionTool:
     """Create a Strands tool that returns static peer groups."""
 
-    backend = PeersTool(use_fixtures=use_fixtures, fixtures_path=fixtures_path)
+    backend = PeersTool()
 
     @tool(name="peers", description="Return a static list of comparable tickers for the target company.")
     def peers_tool(ticker: str) -> Dict[str, List[str]]:
