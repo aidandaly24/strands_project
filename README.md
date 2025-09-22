@@ -1,4 +1,4 @@
-# Automated Equity Research Copilot (Local Runner)
+# Automated Equity Research Copilot
 
 This repository contains a live-data Strands-powered equity research copilot. The `runner.py` entrypoint loads configuration from environment variables (or a `.env` file), instantiates the official `strands.Agent` runtime with custom research tools that call OpenAI (or AWS Bedrock), Yahoo Finance, NewsAPI/GDELT, and the SEC submissions API, then produces Markdown and JSON briefs for the requested tickers.
 
