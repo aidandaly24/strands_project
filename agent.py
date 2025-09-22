@@ -1,12 +1,15 @@
 """Research orchestration that runs on top of the Strands Agent runtime."""
 from __future__ import annotations
 
+import json
+import textwrap
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from statistics import fmean
 from typing import Any, Dict, Iterable, List, Optional, cast
 
+from pydantic import BaseModel, ValidationError
 from strands import Agent
 from strands.tools.decorator import DecoratedFunctionTool
 
@@ -20,6 +23,17 @@ from tools import (
 )
 
 from settings import Settings
+
+
+class ResearchSections(BaseModel):
+    """Structured representation of the narrative sections in a brief."""
+
+    overview: str
+    moat: str
+    performance: str
+    catalysts: str
+    risks: str
+    valuation: str
 
 
 @dataclass(slots=True)
@@ -63,8 +77,10 @@ class ResearchAgent:
         self.agent = Agent(
             tools=list(self._tool_objects.values()),
             system_prompt=(
-                "You are an equity research assistant that combines structured data sources "
-                "to produce concise, citation-backed insights."
+                "You are an equity research assistant who synthesises prices, fundamentals, "
+                "filing excerpts, peer comparisons, and news flow into thorough, citation-"
+                "aware investment briefs. Analyse the full data context and write multi-"
+                "paragraph sections that highlight drivers, nuances, and supporting evidence."
             ),
         )
 
@@ -114,22 +130,51 @@ class ResearchAgent:
                     "published_at": article.get("published_at"),
                 }
             )
+        edgar_source_url: Optional[str]
+        if self.settings.use_fixtures:
+            edgar_source_url = str(self.settings.fixtures_path / f"filing_{ticker}_item7.html")
+        else:
+            edgar_source_url = cast(Optional[str], edgar_data.get("source_url") or edgar_data.get("url"))
+
         citations.append(
             {
                 "ticker": ticker,
                 "title": "Management discussion and analysis excerpt",
-                "url": str(self.settings.fixtures_path / f"filing_{ticker}_item7.html"),
+                "url": edgar_source_url,
                 "source": "SEC Filing Fixture" if self.settings.use_fixtures else "SEC EDGAR",
-                "published_at": "",
+                "published_at": cast(str, edgar_data.get("filed_on", "")),
             }
         )
 
-        overview = self._build_overview(price_data, ratio_data, avg_sentiment)
-        moat = edgar_data.get("section", "Management commentary unavailable.")
-        performance = self._build_performance(ratio_data, price_data)
-        catalysts = self._summarise_articles(positive_articles)
-        risks = self._summarise_articles(negative_articles)
-        valuation = self._build_valuation(price_data)
+        generated_sections = self._generate_sections(
+            ticker=ticker,
+            price_data=price_data,
+            ratio_data=ratio_data,
+            news_data=news_data,
+            edgar_data=edgar_data,
+            peers_data=peers_data,
+            avg_sentiment=avg_sentiment,
+            positive_articles=positive_articles,
+            negative_articles=negative_articles,
+        )
+
+        if generated_sections is None:
+            overview = self._build_overview(price_data, ratio_data, avg_sentiment)
+            moat = edgar_data.get("section", "Management commentary unavailable.")
+            performance = self._build_performance(ratio_data, price_data)
+            catalysts = self._summarise_articles(positive_articles)
+            risks = self._summarise_articles(negative_articles)
+            valuation = self._build_valuation(price_data)
+            sections_payload = {
+                "overview": overview,
+                "moat": moat,
+                "performance": performance,
+                "catalysts": catalysts,
+                "risks": risks,
+                "valuation": valuation,
+            }
+        else:
+            sections_payload = generated_sections.model_dump()
 
         return {
             "ticker": ticker,
@@ -142,16 +187,86 @@ class ResearchAgent:
                 "average": round(avg_sentiment, 2),
                 "article_count": len(articles),
             },
-            "sections": {
-                "overview": overview,
-                "moat": moat,
-                "performance": performance,
-                "catalysts": catalysts,
-                "risks": risks,
-                "valuation": valuation,
-            },
+            "sections": sections_payload,
             "citations": citations,
         }
+
+    def _generate_sections(
+        self,
+        *,
+        ticker: str,
+        price_data: Dict[str, Any],
+        ratio_data: Dict[str, Any],
+        news_data: Dict[str, Any],
+        edgar_data: Dict[str, Any],
+        peers_data: Dict[str, Any],
+        avg_sentiment: float,
+        positive_articles: List[Dict[str, Any]],
+        negative_articles: List[Dict[str, Any]],
+    ) -> Optional[ResearchSections]:
+        """Request multi-paragraph sections from the hosted research agent."""
+
+        structured_fn = getattr(self.agent, "structured_output", None)
+        if structured_fn is None:
+            return None
+
+        prompt = textwrap.dedent(
+            f"""
+            You are preparing a comprehensive equity research brief for {ticker}. Analyse the
+            structured context and produce nuanced paragraphs for each section below. Each
+            section must contain at least two sentences or explicit paragraph breaks and should
+            reference supporting evidence using markdown citations where possible.
+
+            ## Price & performance snapshot
+            {json.dumps(price_data, indent=2, default=str)}
+
+            ## Technical and fundamental ratios
+            {json.dumps(ratio_data, indent=2, default=str)}
+
+            ## Recent news flow
+            {json.dumps(news_data.get("articles", []), indent=2, default=str)}
+
+            ## Filing excerpts
+            {json.dumps(edgar_data, indent=2, default=str)}
+
+            ## Peer benchmarks
+            {json.dumps(peers_data, indent=2, default=str)}
+
+            ## Sentiment summary
+            {json.dumps({"average": avg_sentiment, "positives": len(positive_articles), "negatives": len(negative_articles)}, indent=2, default=str)}
+
+            Craft analytical copy for the following fields: overview, moat, performance,
+            catalysts, risks, valuation. Highlight what the data implies for the company,
+            mention catalysts and watchpoints surfaced in the articles, and include peer or
+            valuation context when appropriate. Do not return markdown headings; only the
+            prose for each field. Use citation indices like [1] that can map onto the supplied
+            sources.
+            """
+        ).strip()
+
+        candidate_payloads = (
+            {"prompt": prompt, "response_model": ResearchSections},
+            {"prompt": prompt, "schema": ResearchSections},
+            {"input": prompt, "response_model": ResearchSections},
+        )
+
+        for call_kwargs in candidate_payloads:
+            try:
+                result = structured_fn(**call_kwargs)
+            except TypeError:
+                continue
+            except Exception:
+                return None
+
+            if isinstance(result, ResearchSections):
+                return result
+
+            try:
+                return ResearchSections.model_validate(result)
+            except ValidationError:
+                continue
+
+        return None
 
     def _format_markdown_for_ticker(self, payload: Dict[str, Any]) -> str:
         ticker = payload["ticker"]
@@ -233,13 +348,21 @@ class ResearchAgent:
     @staticmethod
     def _summarise_articles(articles: List[Dict[str, Any]]) -> str:
         if not articles:
-            return "No notable items in the latest coverage."
+            return (
+                "Recent monitoring did not surface fresh red flags for the company. "
+                "Investors should remain mindful of execution risks and potential regulatory scrutiny in core markets."
+            )
+        tone = "favourable" if articles[0].get("sentiment", 0) >= 0 else "cautionary"
         bullets = []
         for article in articles[:3]:
             summary = article.get("summary") or article.get("title")
             source = article.get("source", "")
             bullets.append(f"- {summary} ({source})")
-        return "\n".join(bullets)
+        intro = (
+            f"Recent coverage surfaces {len(articles)} {tone} developments shaping investor "
+            "sentiment."
+        )
+        return intro + "\n\n" + "\n".join(bullets)
 
     @staticmethod
     def _build_valuation(price_data: Dict[str, Any]) -> str:
@@ -249,5 +372,6 @@ class ResearchAgent:
         distance_to_high = ((high - latest) / high * 100) if high else 0.0
         return (
             f"Trading {distance_to_high:.1f}% below the 52-week high of ${high:.2f}, "
-            f"with downside to the 52-week low at ${low:.2f}."
+            f"with downside to the 52-week low at ${low:.2f}. "
+            f"The latest close near ${latest:.2f} frames the upside/downside skew investors are weighing."
         )
