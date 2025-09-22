@@ -8,33 +8,36 @@ This repository contains a local-first prototype of the Strands-powered equity r
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python runner.py AMZN --focus "Logistics automation and Prime retention"
+python runner.py AMZN --focus "AWS's power to keep on bringing strong revenue gains"
 ```
 
 Outputs are saved to `runs/<timestamp>/brief.json` and `runs/<timestamp>/brief.md`.
 
 ## Environment Variables
 
-| Variable | Description |
-| --- | --- |
-| `OPENAI_API_KEY` | Optional OpenAI API key for future extensions. |
-| `SEC_UA` | SEC EDGAR user agent string. Required for live filing retrieval. |
-| `NEWS_TOKEN` | NewsAPI token. Optional if using fixtures. |
-| `USE_FIXTURES` | When `true`, load canned data from `fixtures/` (default). |
-| `FIXTURES_PATH` | Override path to fixture directory. |
-| `RUNS_DIR` | Override output directory for generated briefs. |
+| Variable         | Description                                                      |
+| ---------------- | ---------------------------------------------------------------- |
+| `OPENAI_API_KEY` | OpenAI API key for model inference. Optional when using Bedrock. |
+| `OPENAI_MODEL_ID`| Override the default OpenAI model (`gpt-4o-mini`).               |
+| `SEC_UA`         | SEC EDGAR user agent string. Required for live filing retrieval. |
+| `NEWS_TOKEN`     | NewsAPI token. Optional when falling back to GDELT headlines.    |
+| `BEDROCK_MODEL_ID` | Optional Bedrock model id (default `anthropic.claude-3-haiku-20240307-v1:0`). |
+| `AWS_REGION`     | AWS region for Bedrock when using AWS credentials.               |
+| `RUNS_DIR`       | Override output directory for generated briefs.                  |
 
 A sample `.env` file:
 
 ```ini
-USE_FIXTURES=true
+OPENAI_API_KEY="sk-..."  # or omit when using AWS Bedrock
 SEC_UA="Example Contact (dev@example.com)"
-NEWS_TOKEN="newsapi-token"
+NEWS_TOKEN="newsapi-token"  # optional, falls back to GDELT when absent
+BEDROCK_MODEL_ID="anthropic.claude-3-haiku-20240307-v1:0"  # optional
+AWS_REGION="us-east-1"  # required when using Bedrock
 ```
 
 ## Testing
 
-Run the pytest suite to validate the offline fixture workflow:
+Run the pytest suite to verify configuration guards:
 
 ```bash
 pytest

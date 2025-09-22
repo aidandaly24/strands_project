@@ -36,13 +36,17 @@ class Settings:
 
         fixtures_path = Path(os.getenv("FIXTURES_PATH", "fixtures"))
         runs_dir = Path(os.getenv("RUNS_DIR", "runs"))
+
+        if _get_bool("USE_FIXTURES", default=False):
+            raise ValueError("Offline fixture mode is disabled. Remove USE_FIXTURES from the environment.")
+
         return cls(
             openai_api_key=os.getenv("OPENAI_API_KEY"),
             sec_user_agent=os.getenv("SEC_UA"),
             news_token=os.getenv("NEWS_TOKEN"),
             env=os.getenv("ENV", "dev"),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
-            use_fixtures=_get_bool("USE_FIXTURES", default=True),
+            use_fixtures=False,
             fixtures_path=fixtures_path,
             runs_dir=runs_dir,
         )

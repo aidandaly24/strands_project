@@ -24,7 +24,7 @@ class PricesTool(BaseTool):
     def fetch(self, ticker: str) -> Dict[str, Any]:
         ticker = ticker.upper()
         if self.use_fixtures:
-            return self.load_fixture_json(f"prices_{ticker}.json")
+            raise RuntimeError("Fixture mode is disabled; live market data is required.")
         if yf is None:
             raise RuntimeError("yfinance is required for live price fetching but is not installed.")
 

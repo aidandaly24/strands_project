@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import textwrap
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from statistics import fmean
 from typing import Any, Dict, Iterable, List, Optional, cast
@@ -23,6 +23,14 @@ from tools import (
 )
 
 from settings import Settings
+
+
+SYSTEM_PROMPT = (
+    "You are an equity research assistant who synthesises prices, fundamentals, "
+    "filing excerpts, peer comparisons, and news flow into thorough, citation-"
+    "aware investment briefs. Analyse the full data context and write multi-"
+    "paragraph sections that highlight drivers, nuances, and supporting evidence."
+)
 
 
 class ResearchSections(BaseModel):
@@ -46,7 +54,7 @@ class RunArtifacts:
 class ResearchAgent:
     """Aggregate the individual tools to produce research artifacts."""
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, *, model: Any | None = None) -> None:
         self.settings = settings
 
         self._tool_objects: Dict[str, DecoratedFunctionTool] = {
@@ -74,19 +82,17 @@ class ResearchAgent:
             ),
         }
 
-        self.agent = Agent(
-            tools=list(self._tool_objects.values()),
-            system_prompt=(
-                "You are an equity research assistant who synthesises prices, fundamentals, "
-                "filing excerpts, peer comparisons, and news flow into thorough, citation-"
-                "aware investment briefs. Analyse the full data context and write multi-"
-                "paragraph sections that highlight drivers, nuances, and supporting evidence."
-            ),
-        )
+        agent_kwargs: Dict[str, Any] = {
+            "tools": list(self._tool_objects.values()),
+            "system_prompt": SYSTEM_PROMPT,
+        }
+        if model is not None:
+            agent_kwargs["model"] = model
+        self.agent = Agent(**agent_kwargs)
 
     def run(self, tickers: Iterable[str], *, focus: Optional[str] = None) -> RunArtifacts:
         tickers = [ticker.upper() for ticker in tickers]
-        generated_at = datetime.now(UTC)
+        generated_at = datetime.now(timezone.utc)
         run_id = generated_at.strftime("%Y%m%d_%H%M%S")
         output_dir = self.settings.runs_dir / run_id
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -101,7 +107,7 @@ class ResearchAgent:
 
         json_payload = {
             "run_id": run_id,
-            "generated_at": generated_at.isoformat() + "Z",
+            "generated_at": generated_at.isoformat().replace("+00:00", "Z"),
             "tickers": ticker_payloads,
         }
         markdown = "\n\n".join(markdown_sections).strip() + "\n"
