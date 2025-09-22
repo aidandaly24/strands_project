@@ -59,7 +59,7 @@ AWS_PROFILE="bedrock-programmatic"  # or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY
 python3 runner.py AMZN --focus "AWS's revenue growth"
 ```
 ----------------------
-Output in Markdown:
+Output is given in Markdown:
 # Research Brief
 
 ## AMZN
