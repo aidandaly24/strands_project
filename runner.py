@@ -30,7 +30,7 @@ def run(tickers: Iterable[str], *, focus: Optional[str] = None) -> RunArtifacts:
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate equity research briefs using the Strands runner.")
-    parser.add_argument("tickers", nargs="*", help="Ticker symbols to analyse", default=["PLTR"])
+    parser.add_argument("tickers", nargs="*", help="Ticker symbols to analyse", default=["AMZN"])
     parser.add_argument("--focus", help="Optional focus prompt to steer the brief", default=None)
     return parser
 
@@ -38,7 +38,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def main() -> None:
     parser = build_arg_parser()
     args = parser.parse_args()
-    tickers = args.tickers or ["PLTR"]
+    tickers = args.tickers or ["AMZN"]
     run(tickers, focus=args.focus)
 
 

@@ -121,9 +121,9 @@ runs/20250921_153000/
 Directory: `fixtures/`
 ```
 fixtures/
-  news_PLTR.json
-  prices_PLTR.json
-  filing_ORCL_item7.html
+  news_AMZN.json
+  prices_AMZN.json
+  filing_AMZN_item7.html
 ```
 
 A global flag `USE_FIXTURES` allows tools to load canned payloads instead of live calls for development without internet access.
@@ -132,7 +132,7 @@ A global flag `USE_FIXTURES` allows tools to load canned payloads instead of liv
 
 ## 8) Acceptance Criteria
 
-- Running `runner.py` with `tickers=["PLTR"]` prints Markdown and saves JSON/MD to disk.
+- Running `runner.py` with `tickers=["AMZN"]` prints Markdown and saves JSON/MD to disk.
 - JSON contains metrics, peers, sentiment, and ≥2 citations.
 - Markdown has structured sections: Overview, Moat, Performance, Catalysts, Risks, Valuation.
 - Run completes in < 8s p95 on free stack.
@@ -168,7 +168,7 @@ python runner.py
 ---
 
 ## 12) Rollout
-- v0.1: Local runner with PLTR, outputs JSON + Markdown.  
+- v0.1: Local runner with AMZN, outputs JSON + Markdown.
 - v0.2: Add comparison for multiple tickers.  
 - v0.3: Fixtures + offline toggle.  
 - v1.0: FastAPI service for external clients.

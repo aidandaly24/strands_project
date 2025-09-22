@@ -11,9 +11,9 @@ from .base import BaseTool, json_tool_response
 
 
 _PEER_MAP: Dict[str, List[str]] = {
-    "PLTR": ["SNOW", "DDOG", "MSFT"],
+    "AMZN": ["MSFT", "GOOGL", "WMT"],
     "MSFT": ["GOOGL", "AMZN", "AAPL"],
-    "SNOW": ["PLTR", "DDOG", "MDB"],
+    "SNOW": ["DDOG", "MDB", "NOW"],
 }
 
 

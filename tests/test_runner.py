@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+import re
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -17,7 +18,7 @@ def test_runner_generates_expected_artifacts(tmp_path, monkeypatch):
     monkeypatch.setenv("RUNS_DIR", str(tmp_path))
     monkeypatch.setenv("FIXTURES_PATH", str(PROJECT_ROOT / "fixtures"))
 
-    artifacts = runner.run(["PLTR"], focus="AI adoption in defense")
+    artifacts = runner.run(["AMZN"], focus="Logistics automation and Prime retention")
 
     json_path = artifacts.output_dir / "brief.json"
     md_path = artifacts.output_dir / "brief.md"
@@ -26,11 +27,16 @@ def test_runner_generates_expected_artifacts(tmp_path, monkeypatch):
     assert md_path.exists()
 
     payload = json.loads(json_path.read_text(encoding="utf-8"))
-    assert payload["tickers"][0]["ticker"] == "PLTR"
+    assert payload["tickers"][0]["ticker"] == "AMZN"
     sections = payload["tickers"][0]["sections"]
     for key in ["overview", "moat", "performance", "catalysts", "risks", "valuation"]:
         assert key in sections
         assert sections[key]
+        sentences = re.findall(r"[^.!?]+[.!?]", sections[key])
+        has_paragraph_break = "\n\n" in sections[key]
+        assert len(sentences) >= 2 or has_paragraph_break, (
+            f"Section '{key}' should contain multi-sentence or multi-paragraph analysis."
+        )
 
     citations = payload["tickers"][0]["citations"]
     assert len(citations) >= 3

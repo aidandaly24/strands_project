@@ -8,7 +8,7 @@ This repository contains a local-first prototype of the Strands-powered equity r
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python runner.py PLTR --focus "AI adoption in defense"
+python runner.py AMZN --focus "Logistics automation and Prime retention"
 ```
 
 Outputs are saved to `runs/<timestamp>/brief.json` and `runs/<timestamp>/brief.md`.

@@ -1,0 +1,29 @@
+{
+  "ticker": "AMZN",
+  "articles": [
+    {
+      "title": "Amazon's cloud unit pushes custom AI chips to lure enterprises",
+      "summary": "Amazon Web Services unveiled new Graviton and Trainium roadmaps aimed at lowering inference costs for corporate AI workloads.",
+      "url": "https://www.reuters.com/technology/amazons-aws-pitches-custom-ai-chips-to-enterprises-2024-04-04/",
+      "published_at": "2024-04-04",
+      "sentiment": 0.45,
+      "source": "Reuters"
+    },
+    {
+      "title": "Prime refresh and grocery expansion keep Amazon's retail engine humming",
+      "summary": "Analysts note accelerating Prime adoption and new Amazon Fresh formats as key growth catalysts for the retail segment.",
+      "url": "https://www.marketwatch.com/story/prime-refresh-and-grocery-expansion-keep-amazons-retail-engine-humming-11698432123",
+      "published_at": "2024-04-03",
+      "sentiment": 0.25,
+      "source": "MarketWatch"
+    },
+    {
+      "title": "Advertising profits bolster Amazon ahead of next earnings report",
+      "summary": "Advertising services continue to post double-digit growth, helping fund ongoing logistics and content investments.",
+      "url": "https://www.bloomberg.com/news/articles/2024-04-02/amazon-advertising-profits-bolster-results-ahead-of-earnings",
+      "published_at": "2024-04-02",
+      "sentiment": 0.3,
+      "source": "Bloomberg"
+    }
+  ]
+}
